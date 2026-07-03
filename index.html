@@ -289,7 +289,7 @@ function toast(msg, type='ok', dur=3000){
 }
 
 window.onerror = function(msg, url, line, col){
-  console.error('JS ERROR:', msg, line, col);
+  alert('JS ERROR: '+msg+' | line:'+line+' col:'+col);
   return false;
 };
 
