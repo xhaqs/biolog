@@ -1,0 +1,10 @@
+{
+  "name": "Fauna — Field Species Log",
+  "short_name": "Fauna",
+  "description": "Identify, log, and map plant and animal species in the field",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#DDD3B0",
+  "theme_color": "#1C2818",
+  "icons": []
+}
