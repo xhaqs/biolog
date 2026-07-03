@@ -474,7 +474,16 @@ async function saveSighting(imageData, idResult, loc){
 }
 
 function saveLedgerLocal(){
-  localStorage.setItem('fauna_sightings', JSON.stringify(_sightings.slice(0,100)));
+  try{
+    localStorage.setItem('fauna_sightings', JSON.stringify(_sightings.slice(0,100)));
+  }catch(e){
+    try{
+      const lean = _sightings.slice(0,30).map(s=>({...s, photo: s.photo ? s.photo.slice(0,200)+'...(cached)' : ''}));
+      localStorage.setItem('fauna_sightings', JSON.stringify(lean));
+    }catch(e2){
+      localStorage.removeItem('fauna_sightings');
+    }
+  }
 }
 
 function deleteSighting(id){
