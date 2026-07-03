@@ -4,15 +4,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === '/api/debug') {
-      return new Response(JSON.stringify({
-        hasKey: !!env.ANTHROPIC_API_KEY,
-        keyType: typeof env.ANTHROPIC_API_KEY,
-        keyLength: env.ANTHROPIC_API_KEY ? env.ANTHROPIC_API_KEY.length : 0,
-        keyStart: env.ANTHROPIC_API_KEY ? env.ANTHROPIC_API_KEY.slice(0, 12) : 'none'
-      }), { headers: { 'Content-Type': 'application/json' } });
-    }
-
     if (url.pathname === '/api/identify' && request.method === 'POST') {
       return handleIdentify(request, env);
     }
