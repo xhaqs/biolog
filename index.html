@@ -263,7 +263,7 @@ header .tag{
 <div class="section-label">
   <span>Field Ledger</span>
   <span style="display:flex;gap:6px;align-items:center">
-    <button onclick="toggleMapView()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">🗺</button>
+    <button onclick="toggleMapView()" style="font-size:11px;font-family:'IBM Plex Mono',monospace;background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:6px 10px;cursor:pointer;font-weight:600">🗺 MAP</button>
     <button onclick="exportCSV()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">CSV</button>
     <button onclick="exportPDF()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">PDF</button>
     <span id="ledgerCount" class="mono">0 entries</span>
@@ -309,20 +309,84 @@ function handleFileUpload(e){
 function processImageFile(file){
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = async ev => {
+  reader.onload = ev => {
     const dataUrl = ev.target.result;
     document.getElementById('capturePlaceholder').style.display = 'none';
     const img = document.getElementById('capturedImg');
     img.src = dataUrl;
     img.style.display = 'block';
-    const status = document.getElementById('captureStatus');
-    status.style.display = 'block';
-    status.textContent = 'GETTING LOCATION...';
-    const loc = await getLocation();
-    status.textContent = 'ANALYZING SPECIMEN...';
-    await identifySpecies(dataUrl, loc);
+    showTargetPrompt(dataUrl, img);
   };
   reader.readAsDataURL(file);
+}
+
+function showTargetPrompt(dataUrl, imgEl){
+  const status = document.getElementById('captureStatus');
+  status.style.display = 'block';
+  status.textContent = '🎯 TAP THE SPECIMEN, OR USE FULL PHOTO';
+
+  let fullBtn = document.getElementById('useFullPhotoBtn');
+  if(!fullBtn){
+    fullBtn = document.createElement('button');
+    fullBtn.id = 'useFullPhotoBtn';
+    fullBtn.textContent = 'Use Full Photo';
+    fullBtn.style.cssText = 'position:absolute;bottom:36px;left:50%;transform:translateX(-50%);background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:8px 16px;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer;z-index:5';
+    document.getElementById('captureHero').appendChild(fullBtn);
+  }
+  fullBtn.style.display = 'block';
+  fullBtn.onclick = (e) => {
+    e.stopPropagation();
+    fullBtn.style.display = 'none';
+    proceedWithImage(dataUrl);
+  };
+
+  imgEl.style.cursor = 'crosshair';
+  imgEl.onclick = (e) => {
+    const rect = imgEl.getBoundingClientRect();
+    const xRatio = (e.clientX - rect.left) / rect.width;
+    const yRatio = (e.clientY - rect.top) / rect.height;
+    fullBtn.style.display = 'none';
+    cropAroundPoint(dataUrl, xRatio, yRatio);
+  };
+}
+
+function cropAroundPoint(dataUrl, xRatio, yRatio){
+  const status = document.getElementById('captureStatus');
+  status.textContent = '🎯 TARGET LOCKED — CROPPING...';
+  const tempImg = new Image();
+  tempImg.onload = () => {
+    const w = tempImg.width, h = tempImg.height;
+    const cropSize = Math.min(w, h) * 0.6;
+    let cx = xRatio * w, cy = yRatio * h;
+    let sx = Math.max(0, Math.min(w - cropSize, cx - cropSize/2));
+    let sy = Math.max(0, Math.min(h - cropSize, cy - cropSize/2));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cropSize;
+    canvas.height = cropSize;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(tempImg, sx, sy, cropSize, cropSize, 0, 0, cropSize, cropSize);
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+    const img = document.getElementById('capturedImg');
+    img.src = croppedDataUrl;
+    proceedWithImage(croppedDataUrl);
+  };
+  tempImg.src = dataUrl;
+}
+
+async function proceedWithImage(dataUrl){
+  const img = document.getElementById('capturedImg');
+  img.onclick = null;
+  img.style.cursor = 'default';
+  const fullBtn = document.getElementById('useFullPhotoBtn');
+  if(fullBtn) fullBtn.style.display = 'none';
+
+  const status = document.getElementById('captureStatus');
+  status.textContent = 'GETTING LOCATION...';
+  const loc = await getLocation();
+  status.textContent = 'ANALYZING SPECIMEN...';
+  await identifySpecies(dataUrl, loc);
 }
 
 async function identifySpecies(imageData, loc){
