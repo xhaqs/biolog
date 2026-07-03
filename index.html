@@ -6,6 +6,8 @@
 <title>Fauna — Field Species Log</title>
 <link rel="manifest" href="/manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{
   --ink:#1C2818;
@@ -206,6 +208,16 @@ header .tag{
   font-size:12px;
 }
 
+#mapView{
+  display:none;
+  margin:0 16px 16px;
+  border-radius:4px;
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+#specimenMap{height:320px;filter:sepia(15%) saturate(75%) brightness(95%);}
+.leaflet-popup-content-wrapper{background:var(--card)!important;color:var(--ink)!important;border-radius:3px!important;font-family:'IBM Plex Sans',sans-serif!important}
+.leaflet-popup-tip{background:var(--card)!important}
 #toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
   padding:10px 20px;border-radius:3px;font-size:13px;
@@ -245,8 +257,12 @@ header .tag{
 
 <div class="section-label">
   <span>Field Ledger</span>
-  <span id="ledgerCount" class="mono">0 entries</span>
+  <span style="display:flex;gap:8px;align-items:center">
+    <button onclick="toggleMapView()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 8px;cursor:pointer;color:var(--slate)">🗺 MAP</button>
+    <span id="ledgerCount" class="mono">0 entries</span>
+  </span>
 </div>
+<div id="mapView"><div id="specimenMap"></div></div>
 <div id="ledgerList"></div>
 
 <div id="toast"></div>
@@ -470,6 +486,62 @@ function renderLedger(){
     +'</div>'
     +'</div>'
   ).join('');
+}
+
+let _mapInstance = null;
+let _mapVisible = false;
+
+function toggleMapView(){
+  _mapVisible = !_mapVisible;
+  const mapEl = document.getElementById('mapView');
+  const listEl = document.getElementById('ledgerList');
+  if(_mapVisible){
+    mapEl.style.display = 'block';
+    listEl.style.display = 'none';
+    renderMap();
+  } else {
+    mapEl.style.display = 'none';
+    listEl.style.display = 'block';
+  }
+}
+
+function renderMap(){
+  const withGps = _sightings.filter(s=>s.lat && s.lng);
+  if(!_mapInstance){
+    _mapInstance = L.map('specimenMap', {zoomControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap'
+    }).addTo(_mapInstance);
+  }
+
+  _mapInstance.eachLayer(layer=>{
+    if(layer instanceof L.Marker) _mapInstance.removeLayer(layer);
+  });
+
+  if(!withGps.length){
+    _mapInstance.setView([0,0], 2);
+    return;
+  }
+
+  const bounds = [];
+  withGps.forEach(s=>{
+    const color = s.kingdom==='flora' ? '#5C6B3F' : '#9C4A1E';
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:'+color+';border:2px solid #DDD3B0;box-shadow:0 0 0 1px '+color+'"></div>',
+      iconSize: [14,14]
+    });
+    const marker = L.marker([s.lat, s.lng], {icon}).addTo(_mapInstance);
+    marker.bindPopup('<b>'+s.name+'</b><br><i>'+(s.latin||'')+'</i><br><span style="font-family:monospace;font-size:10px">'+s.catalogNo+'</span>');
+    bounds.push([s.lat, s.lng]);
+  });
+
+  if(bounds.length === 1){
+    _mapInstance.setView(bounds[0], 13);
+  } else {
+    _mapInstance.fitBounds(bounds, {padding:[30,30]});
+  }
 }
 
 function toggleLocalName(idx){

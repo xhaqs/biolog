@@ -13,7 +13,7 @@ export default {
 
     const assetResponse = await env.ASSETS.fetch(request);
     const newResponse = new Response(assetResponse.body, assetResponse);
-    newResponse.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebasedatabase.app https://api.anthropic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; base-uri 'self'");
+    newResponse.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebasedatabase.app https://api.anthropic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; media-src 'self' data: blob:; base-uri 'self'");
     return newResponse;
   }
 };
