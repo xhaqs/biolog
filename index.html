@@ -491,6 +491,11 @@ function renderLedger(){
       +'<span>'+formatTime(s.ts)+'</span>'
       +'<span>'+(s.lat?s.lat.toFixed(4)+', '+s.lng.toFixed(4):'no gps')+'</span>'
     +'</div>'
+    +'<div style="display:flex;gap:4px;padding:0 12px 10px">'
+      +'<button onclick="shareSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">SHARE</button>'
+      +'<button onclick="showSightingQR(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">QR</button>'
+      +'<button onclick="deleteSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--rust);border-radius:2px;padding:5px;cursor:pointer;color:var(--rust)">DELETE</button>'
+    +'</div>'
     +'</div>'
   ).join('');
 }
