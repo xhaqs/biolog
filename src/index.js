@@ -4,6 +4,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === '/api/rangecheck') {
+      return handleRangeCheck(url);
+    }
+
     if (url.pathname === '/api/identify' && request.method === 'POST') {
       return handleIdentify(request, env);
     }
@@ -17,6 +21,54 @@ export default {
     return newResponse;
   }
 };
+
+async function handleRangeCheck(url) {
+  try {
+    const species = url.searchParams.get('species');
+    const lat = parseFloat(url.searchParams.get('lat'));
+    const lng = parseFloat(url.searchParams.get('lng'));
+
+    if (!species || isNaN(lat) || isNaN(lng)) {
+      return new Response(JSON.stringify({ notable: false }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const matchRes = await fetch('https://api.gbif.org/v1/species/match?name=' + encodeURIComponent(species));
+    const matchData = await matchRes.json();
+    const taxonKey = matchData.usageKey;
+
+    if (!taxonKey) {
+      return new Response(JSON.stringify({ notable: false }), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
+
+    const box = 2.0;
+    const nearbyUrl = 'https://api.gbif.org/v1/occurrence/search?taxonKey=' + taxonKey
+      + '&decimalLatitude=' + (lat - box) + ',' + (lat + box)
+      + '&decimalLongitude=' + (lng - box) + ',' + (lng + box)
+      + '&limit=1';
+    const nearbyRes = await fetch(nearbyUrl);
+    const nearbyData = await nearbyRes.json();
+    const nearbyCount = nearbyData.count || 0;
+
+    const globalUrl = 'https://api.gbif.org/v1/occurrence/search?taxonKey=' + taxonKey + '&limit=1';
+    const globalRes = await fetch(globalUrl);
+    const globalData = await globalRes.json();
+    const globalCount = globalData.count || 0;
+
+    const notable = globalCount > 20 && nearbyCount === 0;
+
+    return new Response(JSON.stringify({ notable, nearbyCount, globalCount }), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ notable: false, error: e.message }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
 
 async function handleIdentify(request, env) {
   try {

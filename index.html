@@ -269,7 +269,14 @@ header .tag{
     <span id="ledgerCount" class="mono">0 entries</span>
   </span>
 </div>
-<div id="mapView"><div id="specimenMap"></div></div>
+<div id="mapView">
+  <div style="display:flex;gap:6px;padding:8px;background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap">
+    <button id="territoryToggle" onclick="toggleTerritory()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">🗺 TERRITORY</button>
+    <button id="replayToggle" onclick="startReplay()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">▶ REPLAY</button>
+    <button id="rangeCheckToggle" onclick="toggleRangeCheck()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">🔬 RANGE CHECK</button>
+  </div>
+  <div id="specimenMap"></div>
+</div>
 <div id="ledgerList"></div>
 
 <div id="toast"></div>
@@ -575,6 +582,12 @@ function renderLedger(){
 
 let _mapInstance = null;
 let _mapVisible = false;
+let _territoryVisible = false;
+let _territoryLayers = [];
+let _replayActive = false;
+let _replayTimer = null;
+let _rangeCheckVisible = false;
+let _rangeCache = {};
 
 function exportCSV(){
   if(!_sightings.length){ toast('No sightings to export','err'); return; }
@@ -652,6 +665,111 @@ function renderMap(){
   } else {
     _mapInstance.fitBounds(bounds, {padding:[30,30]});
   }
+}
+
+function toggleTerritory(){
+  _territoryVisible = !_territoryVisible;
+  const btn = document.getElementById('territoryToggle');
+  if(btn) btn.style.background = _territoryVisible ? 'var(--moss)' : 'none';
+  if(btn) btn.style.color = _territoryVisible ? 'var(--paper)' : 'var(--slate)';
+
+  _territoryLayers.forEach(layer=>_mapInstance.removeLayer(layer));
+  _territoryLayers = [];
+
+  if(_territoryVisible){
+    _sightings.filter(s=>s.lat && s.lng).forEach(s=>{
+      const circle = L.circle([s.lat, s.lng], {
+        radius: 500,
+        color: s.kingdom==='flora' ? '#5C6B3F' : '#9C4A1E',
+        fillColor: s.kingdom==='flora' ? '#5C6B3F' : '#9C4A1E',
+        fillOpacity: 0.08,
+        weight: 1,
+        opacity: 0.3
+      }).addTo(_mapInstance);
+      _territoryLayers.push(circle);
+    });
+  }
+}
+
+function startReplay(){
+  if(_replayActive){
+    clearInterval(_replayTimer);
+    _replayActive = false;
+    const btn = document.getElementById('replayToggle');
+    if(btn){ btn.textContent = '▶ REPLAY'; btn.style.background = 'none'; btn.style.color = 'var(--slate)'; }
+    renderMap();
+    return;
+  }
+
+  const withGps = _sightings.filter(s=>s.lat && s.lng).sort((a,b)=>a.ts-b.ts);
+  if(withGps.length < 2){ toast('Need at least 2 GPS sightings to replay','err'); return; }
+
+  _mapInstance.eachLayer(layer=>{
+    if(layer instanceof L.Marker || layer instanceof L.Polyline) _mapInstance.removeLayer(layer);
+  });
+
+  _replayActive = true;
+  const btn = document.getElementById('replayToggle');
+  if(btn){ btn.textContent = '⏸ STOP'; btn.style.background = 'var(--rust)'; btn.style.color = 'var(--paper)'; }
+
+  let i = 0;
+  const trail = [];
+  const trailLine = L.polyline([], {color:'#9C4A1E', weight:2, opacity:0.6, dashArray:'4,4'}).addTo(_mapInstance);
+
+  _replayTimer = setInterval(()=>{
+    if(i >= withGps.length){
+      clearInterval(_replayTimer);
+      _replayActive = false;
+      if(btn){ btn.textContent = '▶ REPLAY'; btn.style.background = 'none'; btn.style.color = 'var(--slate)'; }
+      return;
+    }
+    const s = withGps[i];
+    const color = s.kingdom==='flora' ? '#5C6B3F' : '#9C4A1E';
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:'+color+';border:2px solid #DDD3B0;box-shadow:0 0 8px '+color+'"></div>',
+      iconSize: [16,16]
+    });
+    const marker = L.marker([s.lat, s.lng], {icon}).addTo(_mapInstance);
+    marker.bindPopup('<b>'+s.name+'</b><br>'+formatTime(s.ts));
+    marker.openPopup();
+    trail.push([s.lat, s.lng]);
+    trailLine.setLatLngs(trail);
+    _mapInstance.panTo([s.lat, s.lng]);
+    i++;
+  }, 1200);
+}
+
+async function toggleRangeCheck(){
+  _rangeCheckVisible = !_rangeCheckVisible;
+  const btn = document.getElementById('rangeCheckToggle');
+  if(btn) btn.style.background = _rangeCheckVisible ? 'var(--moss)' : 'none';
+  if(btn) btn.style.color = _rangeCheckVisible ? 'var(--paper)' : 'var(--slate)';
+
+  if(!_rangeCheckVisible) return;
+
+  const withGps = _sightings.filter(s=>s.lat && s.lng && s.latin);
+  if(!withGps.length){ toast('No sightings with species data to check','err'); return; }
+
+  toast('🔬 Checking against scientific range data...');
+  for(const s of withGps){
+    const key = s.latin+'_'+s.lat.toFixed(2)+'_'+s.lng.toFixed(2);
+    if(_rangeCache[key] === undefined){
+      try{
+        const r = await fetch('/api/rangecheck?species='+encodeURIComponent(s.latin)+'&lat='+s.lat+'&lng='+s.lng);
+        const data = await r.json();
+        _rangeCache[key] = data.notable || false;
+      }catch(e){
+        _rangeCache[key] = false;
+      }
+    }
+    if(_rangeCache[key]){
+      L.marker([s.lat, s.lng], {
+        icon: L.divIcon({className:'', html:'<div style="font-size:16px">🔬</div>', iconSize:[20,20], iconAnchor:[10,25]})
+      }).addTo(_mapInstance).bindPopup('<b>Notable sighting!</b><br>'+s.name+' found outside its typical documented range.');
+    }
+  }
+  toast('🔬 Range check complete');
 }
 
 function toggleLocalName(idx){
