@@ -218,6 +218,11 @@ header .tag{
 #specimenMap{height:320px;filter:sepia(15%) saturate(75%) brightness(95%);}
 .leaflet-popup-content-wrapper{background:var(--card)!important;color:var(--ink)!important;border-radius:3px!important;font-family:'IBM Plex Sans',sans-serif!important}
 .leaflet-popup-tip{background:var(--card)!important}
+@media print{
+  body{background:#fff;color:#000}
+  .capture-hero, .btn-row, .section-label button, #mapView, #toast{display:none!important}
+  .specimen-card{break-inside:avoid;border:1px solid #999;margin-bottom:10px}
+}
 #toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
   padding:10px 20px;border-radius:3px;font-size:13px;
@@ -257,8 +262,10 @@ header .tag{
 
 <div class="section-label">
   <span>Field Ledger</span>
-  <span style="display:flex;gap:8px;align-items:center">
-    <button onclick="toggleMapView()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 8px;cursor:pointer;color:var(--slate)">🗺 MAP</button>
+  <span style="display:flex;gap:6px;align-items:center">
+    <button onclick="toggleMapView()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">🗺</button>
+    <button onclick="exportCSV()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">CSV</button>
+    <button onclick="exportPDF()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:3px 6px;cursor:pointer;color:var(--slate)">PDF</button>
     <span id="ledgerCount" class="mono">0 entries</span>
   </span>
 </div>
@@ -490,6 +497,31 @@ function renderLedger(){
 
 let _mapInstance = null;
 let _mapVisible = false;
+
+function exportCSV(){
+  if(!_sightings.length){ toast('No sightings to export','err'); return; }
+  const headers = ['Catalog No','Name','Latin Name','Local Name','Local Language','Kingdom','Description','Confidence','Latitude','Longitude','Timestamp','Verify Hash'];
+  const rows = _sightings.map(s=>[
+    s.catalogNo, s.name, s.latin, s.localName, s.localLanguage, s.kingdom,
+    '"'+(s.description||'').replace(/"/g,'""')+'"',
+    s.confidence, s.lat||'', s.lng||'', new Date(s.ts).toISOString(), s.verifyHash||''
+  ]);
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'fauna-field-log-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('📄 CSV exported');
+}
+
+function exportPDF(){
+  if(!_sightings.length){ toast('No sightings to export','err'); return; }
+  toast('Opening print dialog — choose "Save as PDF"');
+  setTimeout(()=>window.print(), 300);
+}
 
 function toggleMapView(){
   _mapVisible = !_mapVisible;
