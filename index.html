@@ -16,6 +16,7 @@
   --moss:#5C6B3F;
   --rust:#9C4A1E;
   --slate:#3E4A47;
+  --amber:#C9962C;
   --border:rgba(28,40,24,0.18);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -234,6 +235,11 @@ header .tag{
 </head>
 <body>
 
+<div id="expeditionBanner" style="display:none;background:var(--amber);color:var(--paper);font-size:11px;font-family:'IBM Plex Mono',monospace;padding:8px 14px;text-align:center;display:flex;justify-content:space-between;align-items:center;gap:8px">
+  <span id="expeditionBannerText">📵 OFFLINE — 0 pending</span>
+  <button id="expeditionSyncBtn" onclick="syncExpeditionQueue()" style="background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace">🔄 SYNC NOW</button>
+</div>
+
 <header>
   <div class="display">🐾 Fauna</div>
   <div class="tag">Field Species Log — Identify · Log · Map</div>
@@ -449,6 +455,109 @@ function captureAnotherAngle(){
   input.click();
 }
 
+const EXPED_DB_NAME = 'fauna_expedition';
+const EXPED_STORE = 'pending';
+let _isSyncing = false;
+
+function openExpedDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(EXPED_DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(EXPED_STORE)){
+        db.createObjectStore(EXPED_STORE, {keyPath:'id', autoIncrement:true});
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function queueExpeditionItem(images, loc){
+  const db = await openExpedDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EXPED_STORE, 'readwrite');
+    const store = tx.objectStore(EXPED_STORE);
+    const item = {images, lat: loc?loc.lat:null, lng: loc?loc.lng:null, ts: Date.now()};
+    const req = store.add(item);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function getQueuedItems(){
+  const db = await openExpedDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EXPED_STORE, 'readonly');
+    const store = tx.objectStore(EXPED_STORE);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function removeQueuedItem(id){
+  const db = await openExpedDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EXPED_STORE, 'readwrite');
+    const store = tx.objectStore(EXPED_STORE);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function updateExpeditionBanner(){
+  const banner = document.getElementById('expeditionBanner');
+  const text = document.getElementById('expeditionBannerText');
+  const syncBtn = document.getElementById('expeditionSyncBtn');
+  const items = await getQueuedItems();
+
+  if(!navigator.onLine){
+    banner.style.display = 'flex';
+    text.textContent = '📵 OFFLINE — '+items.length+' pending in expedition queue';
+    syncBtn.style.display = 'none';
+  } else if(items.length > 0){
+    banner.style.display = 'flex';
+    text.textContent = '📶 Online — '+items.length+' pending to sync';
+    syncBtn.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+async function syncExpeditionQueue(){
+  if(_isSyncing) return;
+  if(!navigator.onLine){ toast('Still offline — will sync automatically once reconnected'); return; }
+
+  _isSyncing = true;
+  const items = await getQueuedItems();
+  if(!items.length){ _isSyncing = false; updateExpeditionBanner(); return; }
+
+  const text = document.getElementById('expeditionBannerText');
+  const syncBtn = document.getElementById('expeditionSyncBtn');
+  syncBtn.style.display = 'none';
+
+  for(let i=0; i<items.length; i++){
+    const item = items[i];
+    text.textContent = '🔄 Syncing expedition: '+(i+1)+'/'+items.length+'...';
+    try{
+      const loc = (item.lat && item.lng) ? {lat:item.lat, lng:item.lng} : null;
+      await identifySpecies(item.images, loc);
+      await removeQueuedItem(item.id);
+    }catch(e){
+      // leave in queue, try again next sync
+    }
+  }
+
+  _isSyncing = false;
+  await updateExpeditionBanner();
+  toast('✅ Expedition synced');
+}
+
+window.addEventListener('online', () => { updateExpeditionBanner(); syncExpeditionQueue(); });
+window.addEventListener('offline', () => { updateExpeditionBanner(); });
+
 async function finishBurstAndIdentify(){
   const wrap = document.getElementById('burstBtnWrap');
   if(wrap) wrap.style.display = 'none';
@@ -456,6 +565,17 @@ async function finishBurstAndIdentify(){
   const status = document.getElementById('captureStatus');
   status.textContent = 'GETTING LOCATION...';
   const loc = await getLocation();
+
+  if(!navigator.onLine){
+    await queueExpeditionItem(_burstImages.slice(), loc);
+    _burstImages = [];
+    status.style.display = 'none';
+    await updateExpeditionBanner();
+    toast('📵 Offline — specimen queued for expedition sync');
+    resetCapture();
+    return;
+  }
+
   status.textContent = 'ANALYZING SPECIMEN'+(_burstImages.length>1?' ('+_burstImages.length+' ANGLES)':'')+'...';
   await identifySpecies(_burstImages.slice(), loc);
   _burstImages = [];
@@ -986,6 +1106,8 @@ window.onload = function(){
   const saved = JSON.parse(localStorage.getItem('fauna_sightings')||'[]');
   _sightings = saved;
   renderLedger();
+  updateExpeditionBanner();
+  if(navigator.onLine) syncExpeditionQueue();
 };
 
 window.addEventListener('beforeunload', ()=>{
