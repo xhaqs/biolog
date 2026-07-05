@@ -406,28 +406,28 @@ function showBurstPrompt(){
 
   status.innerHTML = '📸 Add another angle for better accuracy? ('+_burstImages.length+'/3)';
 
-  let addBtn = document.getElementById('addAngleBtn');
-  let doneBtn = document.getElementById('identifyNowBtn');
-  if(!addBtn){
-    addBtn = document.createElement('button');
-    addBtn.id = 'addAngleBtn';
-    addBtn.style.cssText = 'position:absolute;bottom:36px;left:50%;transform:translateX(-70%);background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:3px;padding:8px 14px;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer;z-index:5';
-    document.getElementById('captureHero').appendChild(addBtn);
+  let wrap = document.getElementById('burstBtnWrap');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'burstBtnWrap';
+    wrap.style.cssText = 'position:absolute;bottom:36px;left:0;right:0;display:flex;justify-content:center;gap:10px;z-index:5';
+    document.getElementById('captureHero').appendChild(wrap);
   }
-  if(!doneBtn){
-    doneBtn = document.createElement('button');
-    doneBtn.id = 'identifyNowBtn';
-    doneBtn.style.cssText = 'position:absolute;bottom:36px;left:50%;transform:translate(20%,0);background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:8px 14px;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer;z-index:5';
-    document.getElementById('captureHero').appendChild(doneBtn);
-  }
+  wrap.innerHTML = '';
+  wrap.style.display = 'flex';
 
+  const addBtn = document.createElement('button');
   addBtn.textContent = '+ Add Angle';
-  addBtn.style.display = 'block';
+  addBtn.style.cssText = 'background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:3px;padding:10px 16px;font-size:12px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer';
   addBtn.onclick = captureAnotherAngle;
 
+  const doneBtn = document.createElement('button');
   doneBtn.textContent = '✓ Identify Now';
-  doneBtn.style.display = 'block';
+  doneBtn.style.cssText = 'background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:10px 16px;font-size:12px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer';
   doneBtn.onclick = finishBurstAndIdentify;
+
+  wrap.appendChild(addBtn);
+  wrap.appendChild(doneBtn);
 }
 
 function captureAnotherAngle(){
@@ -450,10 +450,8 @@ function captureAnotherAngle(){
 }
 
 async function finishBurstAndIdentify(){
-  const addBtn = document.getElementById('addAngleBtn');
-  const doneBtn = document.getElementById('identifyNowBtn');
-  if(addBtn) addBtn.style.display = 'none';
-  if(doneBtn) doneBtn.style.display = 'none';
+  const wrap = document.getElementById('burstBtnWrap');
+  if(wrap) wrap.style.display = 'none';
 
   const status = document.getElementById('captureStatus');
   status.textContent = 'GETTING LOCATION...';
