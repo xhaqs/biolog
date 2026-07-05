@@ -280,6 +280,7 @@ header .tag{
     <button id="territoryToggle" onclick="toggleTerritory()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">🗺 TERRITORY</button>
     <button id="replayToggle" onclick="startReplay()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">▶ REPLAY</button>
     <button id="rangeCheckToggle" onclick="toggleRangeCheck()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">🔬 RANGE CHECK</button>
+    <button id="siteHealthToggle" onclick="toggleSiteHealth()" style="font-size:9px;font-family:'IBM Plex Mono',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:4px 8px;cursor:pointer;color:var(--slate)">🏥 SITE HEALTH</button>
   </div>
   <div id="specimenMap"></div>
 </div>
@@ -1074,6 +1075,64 @@ function startReplay(){
     _mapInstance.panTo([s.lat, s.lng]);
     i++;
   }, 1200);
+}
+
+let _siteHealthVisible = false;
+let _siteHealthLayers = [];
+
+function calculateSiteHealth(){
+  const sitesMap = {};
+  _sightings.filter(s=>s.lat && s.lng).forEach(s=>{
+    const key = s.lat.toFixed(2)+','+s.lng.toFixed(2);
+    if(!sitesMap[key]) sitesMap[key] = {lat:s.lat, lng:s.lng, score:0, count:0, sightings:[]};
+    const site = sitesMap[key];
+    site.count++;
+    site.sightings.push(s);
+    if(s.indicatorSpecies === 'yes') site.score += 10;
+    else if(s.invasive_risk === 'high' || s.invasiveRisk === 'high') site.score -= 15;
+    else if(s.invasive_risk === 'medium' || s.invasiveRisk === 'medium') site.score -= 8;
+    else site.score += 1;
+  });
+
+  return Object.values(sitesMap).map(site => {
+    let label, color;
+    if(site.score >= 15){ label = '🌿 Thriving'; color = '#2d6a3e'; }
+    else if(site.score >= 5){ label = '🙂 Stable'; color = '#5C6B3F'; }
+    else if(site.score >= -5){ label = '⚠️ Declining'; color = '#C9962C'; }
+    else { label = '🔴 Critical'; color = '#9C4A1E'; }
+    return {...site, label, color};
+  });
+}
+
+function toggleSiteHealth(){
+  _siteHealthVisible = !_siteHealthVisible;
+  const btn = document.getElementById('siteHealthToggle');
+  if(btn) btn.style.background = _siteHealthVisible ? 'var(--amber)' : 'none';
+  if(btn) btn.style.color = _siteHealthVisible ? 'var(--paper)' : 'var(--slate)';
+
+  _siteHealthLayers.forEach(l=>_mapInstance.removeLayer(l));
+  _siteHealthLayers = [];
+
+  if(_siteHealthVisible){
+    const sites = calculateSiteHealth();
+    if(!sites.length){ toast('No GPS-tagged sightings yet to score','err'); return; }
+
+    sites.forEach(site => {
+      const circle = L.circle([site.lat, site.lng], {
+        radius: 600,
+        color: site.color,
+        fillColor: site.color,
+        fillOpacity: 0.18,
+        weight: 2
+      }).addTo(_mapInstance);
+      circle.bindPopup(
+        '<b>'+site.label+'</b><br>Score: '+site.score+'<br>'+site.count+' sighting'+(site.count>1?'s':'')+' logged here'
+      );
+      _siteHealthLayers.push(circle);
+    });
+
+    toast('🏥 '+sites.length+' site'+(sites.length>1?'s':'')+' scored');
+  }
 }
 
 async function toggleRangeCheck(){
