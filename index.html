@@ -513,6 +513,141 @@ function shareSighting(id){
   }
 }
 
+function generateDiscoveryCard(id){
+  const s = _sightings.find(x=>x.id===id);
+  if(!s) return;
+
+  toast('🎨 Composing Discovery Card...');
+
+  const canvas = document.createElement('canvas');
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    // Background paper
+    ctx.fillStyle = '#DDD3B0';
+    ctx.fillRect(0, 0, W, H);
+
+    // Outer frame border
+    ctx.strokeStyle = '#1C2818';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(24, 24, W-48, H-48);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(38, 38, W-76, H-76);
+
+    // Photo area (top ~62%)
+    const photoTop = 60, photoH = 780, photoW = W-120, photoLeft = 60;
+    const imgRatio = img.width/img.height;
+    const boxRatio = photoW/photoH;
+    let sx=0, sy=0, sw=img.width, sh=img.height;
+    if(imgRatio > boxRatio){
+      sw = img.height * boxRatio;
+      sx = (img.width - sw)/2;
+    } else {
+      sh = img.width / boxRatio;
+      sy = (img.height - sh)/2;
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(photoLeft, photoTop, photoW, photoH);
+    ctx.clip();
+    ctx.drawImage(img, sx, sy, sw, sh, photoLeft, photoTop, photoW, photoH);
+    ctx.restore();
+    ctx.strokeStyle = '#1C2818';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(photoLeft, photoTop, photoW, photoH);
+
+    // Catalog badge (top-left corner over photo)
+    ctx.fillStyle = 'rgba(28,40,24,0.85)';
+    ctx.fillRect(photoLeft+16, photoTop+16, 210, 44);
+    ctx.fillStyle = '#DDD3B0';
+    ctx.font = '22px "IBM Plex Mono", monospace';
+    ctx.fillText(s.catalogNo, photoLeft+30, photoTop+45);
+
+    // Kingdom badge (top-right over photo)
+    const kingdomColor = s.kingdom==='flora' ? '#5C6B3F' : '#9C4A1E';
+    ctx.fillStyle = kingdomColor;
+    ctx.fillRect(photoLeft+photoW-160, photoTop+16, 145, 44);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "IBM Plex Mono", monospace';
+    ctx.fillText((s.kingdom||'fauna').toUpperCase(), photoLeft+photoW-148, photoTop+45);
+
+    // Species name
+    ctx.fillStyle = '#1C2818';
+    ctx.font = 'bold 56px Georgia, serif';
+    wrapText(ctx, s.name, 60, 900, W-120, 60);
+
+    // Latin name
+    if(s.latin){
+      ctx.font = 'italic 32px Georgia, serif';
+      ctx.fillStyle = '#3E4A47';
+      ctx.fillText(s.latin, 60, 975);
+    }
+
+    // Local name if available
+    let yPos = 1020;
+    if(s.localName){
+      ctx.font = '26px Georgia, serif';
+      ctx.fillStyle = '#5C6B3F';
+      ctx.fillText(s.localName + (s.localLanguage ? ' ('+s.localLanguage+')' : ''), 60, yPos);
+      yPos += 40;
+    }
+
+    // Description
+    if(s.description){
+      ctx.font = '22px sans-serif';
+      ctx.fillStyle = '#1C2818';
+      wrapText(ctx, s.description, 60, yPos+30, W-120, 30, 3);
+    }
+
+    // Footer branding
+    ctx.font = '20px "IBM Plex Mono", monospace';
+    ctx.fillStyle = '#3E4A47';
+    ctx.fillText('🐾 FAUNA · Field Species Log', 60, H-70);
+    ctx.textAlign = 'right';
+    ctx.fillText(new Date(s.ts).toLocaleDateString(), W-60, H-70);
+    ctx.textAlign = 'left';
+
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], s.catalogNo+'_discovery_card.png', {type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:s.name, text:'Discovered with Fauna 🐾'}).catch(()=>{});
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = s.catalogNo+'_discovery_card.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      toast('🎨 Discovery Card ready!');
+    }, 'image/png');
+  };
+  img.onerror = () => toast('Could not load photo for card','err');
+  img.src = s.photo;
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
+  const words = text.split(' ');
+  let line = '';
+  let lines = [];
+  for(let i=0; i<words.length; i++){
+    const testLine = line + words[i] + ' ';
+    if(ctx.measureText(testLine).width > maxWidth && i > 0){
+      lines.push(line);
+      line = words[i] + ' ';
+    } else {
+      line = testLine;
+    }
+  }
+  lines.push(line);
+  if(maxLines) lines = lines.slice(0, maxLines);
+  lines.forEach((l, idx) => ctx.fillText(l.trim(), x, y + idx*lineHeight));
+}
+
 function showSightingQR(id){
   const s = _sightings.find(x=>x.id===id);
   if(!s) return;
@@ -572,6 +707,7 @@ function renderLedger(){
       +'<span>'+(s.lat?s.lat.toFixed(4)+', '+s.lng.toFixed(4):'no gps')+'</span>'
     +'</div>'
     +'<div style="display:flex;gap:4px;padding:0 12px 10px">'
+      +'<button onclick="generateDiscoveryCard(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:var(--moss);color:var(--paper);border:none;border-radius:2px;padding:5px;cursor:pointer">CARD</button>'
       +'<button onclick="shareSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">SHARE</button>'
       +'<button onclick="showSightingQR(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">QR</button>'
       +'<button onclick="deleteSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--rust);border-radius:2px;padding:5px;cursor:pointer;color:var(--rust)">DELETE</button>'
