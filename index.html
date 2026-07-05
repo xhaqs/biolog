@@ -246,6 +246,59 @@ header .tag{
   <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--amber);letter-spacing:0.1em;margin-top:5px;font-weight:700">by RIAKOINE EMPIRE</div>
 </header>
 
+<button id="guideFab" onclick="toggleGuide()" style="position:fixed;bottom:20px;right:20px;width:48px;height:48px;border-radius:50%;background:var(--moss);color:var(--paper);border:2px solid var(--paper);font-size:20px;font-weight:700;cursor:pointer;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:'IBM Plex Mono',monospace">?</button>
+
+<div id="guideModal" style="display:none;position:fixed;inset:0;background:rgba(28,40,24,0.92);z-index:300;overflow-y:auto;padding:20px">
+  <div style="max-width:480px;margin:0 auto;background:var(--card);border-radius:6px;padding:24px;position:relative">
+    <button onclick="toggleGuide()" style="position:absolute;top:12px;right:12px;background:none;border:1px solid var(--border);border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;color:var(--ink)">×</button>
+
+    <div class="display" style="font-size:22px;font-weight:700;margin-bottom:4px;color:var(--ink)">🐾 Using Biolog</div>
+    <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--amber);letter-spacing:0.08em;margin-bottom:20px">QUICK GUIDE</div>
+
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">📷 Capture &amp; Identify</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">Tap the viewfinder to take a photo, or upload one. Point at a plant or animal for an instant AI species ID — common name, Latin name, and local/vernacular name where known.</div>
+    </div>
+
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">📸 Multi-Angle Capture</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">After your first photo, you can add up to 2 more angles before identifying — this improves accuracy for tricky specimens. Tap "Identify Now" whenever you're ready.</div>
+    </div>
+
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">📵 Works Offline</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">No signal? Keep capturing — sightings queue safely on your device and automatically identify + sync the moment you're back online. An amber banner shows pending items.</div>
+    </div>
+
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">🗺 Map View</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">
+        <b>🗺 Territory</b> — shade areas you've explored<br>
+        <b>▶ Replay</b> — watch your expedition unfold chronologically<br>
+        <b>🔬 Range Check</b> — flags sightings outside a species' known range (via GBIF)<br>
+        <b>🏥 Site Health</b> — scores an area's ecosystem health from indicator vs invasive species found there
+      </div>
+    </div>
+
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">🐾 Specimen Cards</b></div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">
+        <b>CARD</b> — generate a shareable Discovery Card image<br>
+        <b>SHARE</b> — send sighting details anywhere<br>
+        <b>QR</b> — a scannable proof-of-sighting link<br>
+        Each record carries a tamper-evidence verification hash for data integrity.
+      </div>
+    </div>
+
+    <div style="margin-bottom:6px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--ink)">📄 Export Your Data</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--slate)">Use the CSV or PDF buttons above the Field Ledger to export everything for reporting or research submission.</div>
+    </div>
+  </div>
+</div>
+
+
+
 <div class="capture-hero" id="captureHero" onclick="startCapture()">
   <div class="capture-placeholder" id="capturePlaceholder">
     <div class="icon">◎</div>
@@ -954,6 +1007,11 @@ function exportPDF(){
   if(!_sightings.length){ toast('No sightings to export','err'); return; }
   toast('Opening print dialog — choose "Save as PDF"');
   setTimeout(()=>window.print(), 300);
+}
+
+function toggleGuide(){
+  const modal = document.getElementById('guideModal');
+  modal.style.display = modal.style.display === 'none' ? 'block' : 'none';
 }
 
 function toggleMapView(){
