@@ -83,18 +83,31 @@ async function handleRangeCheck(url) {
 async function handleIdentify(request, env) {
   try {
     const body = await request.json();
-    const { image, mediaType, lat, lng } = body;
+    const { image, mediaType, images, lat, lng } = body;
 
-    if (!image || !mediaType) {
-      return new Response(JSON.stringify({ error: 'image and mediaType required' }), {
+    let imageList = [];
+    if (images && Array.isArray(images)) {
+      imageList = images;
+    } else if (image && mediaType) {
+      imageList = [{ image, mediaType }];
+    }
+
+    if (!imageList.length) {
+      return new Response(JSON.stringify({ error: 'image(s) required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const promptText = 'Identify the plant or animal species in this image.'
+    const promptText = 'Identify the plant or animal species shown in ' + (imageList.length > 1 ? 'these '+imageList.length+' photos (different angles of the same specimen — use all of them together for a more confident identification).' : 'this image.')
       + (lat && lng ? ' The photo was taken near latitude ' + lat + ', longitude ' + lng + ' — use this to infer the region and give the local/vernacular name in whatever language is predominant there.' : '')
       + ' Reply ONLY in valid JSON, no markdown, no preamble, in this exact format: {"name":"English common name","latin":"Scientific name","local_name":"Local/vernacular name in the predominant regional language if known, otherwise empty string","local_language":"name of that language, e.g. Swahili, Spanish, Hindi, otherwise empty string","kingdom":"flora or fauna","description":"2-sentence natural history note: habitat, behavior, or identifying features","confidence":"high, medium, or low","invasive_risk":"high, medium, low, or unknown - whether this species is considered invasive in the given region","invasive_note":"1-sentence explanation if invasive_risk is high or medium, otherwise empty string"}';
+
+    const contentBlocks = imageList.map(img => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mediaType, data: img.image }
+    }));
+    contentBlocks.push({ type: 'text', text: promptText });
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -108,10 +121,7 @@ async function handleIdentify(request, env) {
         max_tokens: 400,
         messages: [{
           role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-            { type: 'text', text: promptText }
-          ]
+          content: contentBlocks
         }]
       })
     });

@@ -382,6 +382,8 @@ function cropAroundPoint(dataUrl, xRatio, yRatio){
   tempImg.src = dataUrl;
 }
 
+let _burstImages = [];
+
 async function proceedWithImage(dataUrl){
   const img = document.getElementById('capturedImg');
   img.onclick = null;
@@ -389,27 +391,95 @@ async function proceedWithImage(dataUrl){
   const fullBtn = document.getElementById('useFullPhotoBtn');
   if(fullBtn) fullBtn.style.display = 'none';
 
+  _burstImages.push(dataUrl);
+  showBurstPrompt();
+}
+
+function showBurstPrompt(){
+  const status = document.getElementById('captureStatus');
+  status.style.display = 'block';
+
+  if(_burstImages.length >= 3){
+    finishBurstAndIdentify();
+    return;
+  }
+
+  status.innerHTML = '📸 Add another angle for better accuracy? ('+_burstImages.length+'/3)';
+
+  let addBtn = document.getElementById('addAngleBtn');
+  let doneBtn = document.getElementById('identifyNowBtn');
+  if(!addBtn){
+    addBtn = document.createElement('button');
+    addBtn.id = 'addAngleBtn';
+    addBtn.style.cssText = 'position:absolute;bottom:36px;left:50%;transform:translateX(-70%);background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:3px;padding:8px 14px;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer;z-index:5';
+    document.getElementById('captureHero').appendChild(addBtn);
+  }
+  if(!doneBtn){
+    doneBtn = document.createElement('button');
+    doneBtn.id = 'identifyNowBtn';
+    doneBtn.style.cssText = 'position:absolute;bottom:36px;left:50%;transform:translate(20%,0);background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:8px 14px;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif;cursor:pointer;z-index:5';
+    document.getElementById('captureHero').appendChild(doneBtn);
+  }
+
+  addBtn.textContent = '+ Add Angle';
+  addBtn.style.display = 'block';
+  addBtn.onclick = captureAnotherAngle;
+
+  doneBtn.textContent = '✓ Identify Now';
+  doneBtn.style.display = 'block';
+  doneBtn.onclick = finishBurstAndIdentify;
+}
+
+function captureAnotherAngle(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      _burstImages.push(ev.target.result);
+      document.getElementById('capturedImg').src = ev.target.result;
+      showBurstPrompt();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+async function finishBurstAndIdentify(){
+  const addBtn = document.getElementById('addAngleBtn');
+  const doneBtn = document.getElementById('identifyNowBtn');
+  if(addBtn) addBtn.style.display = 'none';
+  if(doneBtn) doneBtn.style.display = 'none';
+
   const status = document.getElementById('captureStatus');
   status.textContent = 'GETTING LOCATION...';
   const loc = await getLocation();
-  status.textContent = 'ANALYZING SPECIMEN...';
-  await identifySpecies(dataUrl, loc);
+  status.textContent = 'ANALYZING SPECIMEN'+(_burstImages.length>1?' ('+_burstImages.length+' ANGLES)':'')+'...';
+  await identifySpecies(_burstImages.slice(), loc);
+  _burstImages = [];
 }
 
-async function identifySpecies(imageData, loc){
+async function identifySpecies(images, loc){
   const status = document.getElementById('captureStatus');
+  const imageArr = Array.isArray(images) ? images : [images];
   try{
-    const base64 = imageData.split(',')[1];
-    const mediaType = imageData.split(';')[0].split(':')[1];
+    const payload = imageArr.map(img => ({
+      image: img.split(',')[1],
+      mediaType: img.split(';')[0].split(':')[1]
+    }));
     const r = await fetch('/api/identify', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({image: base64, mediaType: mediaType, lat: loc?loc.lat:null, lng: loc?loc.lng:null})
+      body: JSON.stringify({images: payload, lat: loc?loc.lat:null, lng: loc?loc.lng:null})
     });
     const result = await r.json();
     if(!r.ok) throw new Error(result.error || ('Server error '+r.status));
     status.style.display = 'none';
-    await saveSighting(imageData, result, loc);
+    await saveSighting(imageArr[0], result, loc, imageArr.length);
   }catch(e){
     status.textContent = 'ID FAILED — TAP TO RETRY';
     toast('Identification failed: '+e.message, 'err', 5000);
@@ -435,7 +505,7 @@ async function hashSighting(obj){
   return hashArr.map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
 }
 
-async function saveSighting(imageData, idResult, loc){
+async function saveSighting(imageData, idResult, loc, angleCount){
   _catalogSeq++;
   localStorage.setItem('fauna_catalog_seq', _catalogSeq);
   const catalogNo = 'FN-'+String(_catalogSeq).padStart(4,'0');
@@ -444,6 +514,7 @@ async function saveSighting(imageData, idResult, loc){
   const sighting = {
     id: localId,
     catalogNo,
+    anglesUsed: angleCount || 1,
     name: idResult.name || 'Unknown specimen',
     latin: idResult.latin || '',
     localName: idResult.local_name || '',
