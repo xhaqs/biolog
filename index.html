@@ -640,6 +640,12 @@ async function saveSighting(imageData, idResult, loc, angleCount){
     kingdom: idResult.kingdom || 'fauna',
     description: idResult.description || '',
     confidence: idResult.confidence || '',
+    habitatContext: idResult.habitat_context || '',
+    indicatorSpecies: idResult.indicator_species || '',
+    indicatorNote: idResult.indicator_note || '',
+    weatherTemp: idResult.weather_temp ?? null,
+    weatherCondition: idResult.weather_condition || '',
+    weatherHumidity: idResult.weather_humidity ?? null,
     photo: imageData,
     lat: loc ? loc.lat : null,
     lng: loc ? loc.lng : null,
@@ -889,6 +895,11 @@ function renderLedger(){
       +(s.latin?'<div class="specimen-latin">'+s.latin+'</div>':'')
       +(s.localName?'<button onclick="toggleLocalName('+idx+')" style="font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:1px 6px;margin-top:3px;cursor:pointer;color:var(--slate)">'+(_showLocalNames[idx]?'EN':(s.localLanguage||'LOCAL').toUpperCase().slice(0,3))+' ⇄</button>':'')
       +'<div class="specimen-desc">'+(s.description||'').slice(0,90)+((s.description||'').length>90?'…':'')+'</div>'
+      +((s.habitatContext||s.weatherTemp||s.indicatorSpecies==='yes')?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:9px;font-family:\'IBM Plex Mono\',monospace;color:var(--slate)">'
+        +(s.habitatContext?'<span style="background:var(--card);border:1px solid var(--border);border-radius:2px;padding:2px 6px">📍 '+s.habitatContext+'</span>':'')
+        +(s.weatherTemp!=null?'<span style="background:var(--card);border:1px solid var(--border);border-radius:2px;padding:2px 6px">🌡 '+Math.round(s.weatherTemp)+'°C '+(s.weatherCondition||'')+'</span>':'')
+        +(s.indicatorSpecies==='yes'?'<span style="background:var(--amber);color:var(--paper);border-radius:2px;padding:2px 6px">🔬 BIOINDICATOR</span>':'')
+        +'</div>':'')
       +'</div>'
     +'</div>'
     +'<div class="specimen-footer">'

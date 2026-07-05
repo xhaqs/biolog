@@ -80,6 +80,22 @@ async function handleRangeCheck(url) {
   }
 }
 
+async function getWeather(lat, lng, env) {
+  if (!lat || !lng || !env.OPENWEATHER_API_KEY) return null;
+  try {
+    const r = await fetch('https://api.openweathermap.org/data/2.5/weather?lat='+lat+'&lon='+lng+'&appid='+env.OPENWEATHER_API_KEY+'&units=metric');
+    if (!r.ok) return null;
+    const d = await r.json();
+    return {
+      temp: d.main?.temp,
+      condition: d.weather?.[0]?.description || '',
+      humidity: d.main?.humidity
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function handleIdentify(request, env) {
   try {
     const body = await request.json();
@@ -101,7 +117,8 @@ async function handleIdentify(request, env) {
 
     const promptText = 'Identify the plant or animal species shown in ' + (imageList.length > 1 ? 'these '+imageList.length+' photos (different angles of the same specimen — use all of them together for a more confident identification).' : 'this image.')
       + (lat && lng ? ' The photo was taken near latitude ' + lat + ', longitude ' + lng + ' — use this to infer the region and give the local/vernacular name in whatever language is predominant there.' : '')
-      + ' Reply ONLY in valid JSON, no markdown, no preamble, in this exact format: {"name":"English common name","latin":"Scientific name","local_name":"Local/vernacular name in the predominant regional language if known, otherwise empty string","local_language":"name of that language, e.g. Swahili, Spanish, Hindi, otherwise empty string","kingdom":"flora or fauna","description":"2-sentence natural history note: habitat, behavior, or identifying features","confidence":"high, medium, or low","invasive_risk":"high, medium, low, or unknown - whether this species is considered invasive in the given region","invasive_note":"1-sentence explanation if invasive_risk is high or medium, otherwise empty string"}';
+      + ' Also examine the visual background/surroundings in the photo to infer the immediate habitat context.'
+      + ' Reply ONLY in valid JSON, no markdown, no preamble, in this exact format: {"name":"English common name","latin":"Scientific name","local_name":"Local/vernacular name in the predominant regional language if known, otherwise empty string","local_language":"name of that language, e.g. Swahili, Spanish, Hindi, otherwise empty string","kingdom":"flora or fauna","description":"2-sentence natural history note: habitat, behavior, or identifying features","confidence":"high, medium, or low","invasive_risk":"high, medium, low, or unknown - whether this species is considered invasive in the given region","invasive_note":"1-sentence explanation if invasive_risk is high or medium, otherwise empty string","habitat_context":"brief inferred habitat from the photo background, e.g. near water, degraded forest, urban edge, grassland, wetland, forest canopy, rocky outcrop, garden/cultivated - your best guess from visual cues","indicator_species":"yes or no - whether this species is a recognized bioindicator of ecosystem health (clean water, air quality, undisturbed habitat, etc)","indicator_note":"1-sentence explanation if indicator_species is yes, otherwise empty string"}';
 
     const contentBlocks = imageList.map(img => ({
       type: 'image',
@@ -109,22 +126,25 @@ async function handleIdentify(request, env) {
     }));
     contentBlocks.push({ type: 'text', text: promptText });
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        messages: [{
-          role: 'user',
-          content: contentBlocks
-        }]
-      })
-    });
+    const [response, weather] = await Promise.all([
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: contentBlocks
+          }]
+        })
+      }),
+      getWeather(lat, lng, env)
+    ]);
 
     const data = await response.json();
     if (!response.ok) {
@@ -141,6 +161,12 @@ async function handleIdentify(request, env) {
       parsed = JSON.parse(cleaned);
     } catch (e) {
       parsed = { name: 'Unidentified specimen', latin: '', kingdom: 'fauna', description: text.slice(0, 150), confidence: 'low' };
+    }
+
+    if (weather) {
+      parsed.weather_temp = weather.temp;
+      parsed.weather_condition = weather.condition;
+      parsed.weather_humidity = weather.humidity;
     }
 
     return new Response(JSON.stringify(parsed), {
