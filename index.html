@@ -680,12 +680,9 @@ function saveLedgerLocal(){
   try{
     localStorage.setItem('fauna_sightings', JSON.stringify(_sightings.slice(0,100)));
   }catch(e){
-    try{
-      const lean = _sightings.slice(0,30).map(s=>({...s, photo: s.photo ? s.photo.slice(0,200)+'...(cached)' : ''}));
-      localStorage.setItem('fauna_sightings', JSON.stringify(lean));
-    }catch(e2){
-      localStorage.removeItem('fauna_sightings');
-    }
+    // Quota exceeded — Firebase already has the full data as source of truth.
+    // Do NOT overwrite existing good local cache with a lossy/truncated version.
+    console.warn('Local cache full — relying on Firebase sync for full photo data');
   }
 }
 
@@ -1172,12 +1169,28 @@ function toggleLocalName(idx){
   renderLedger();
 }
 
-window.onload = function(){
-  const saved = JSON.parse(localStorage.getItem('fauna_sightings')||'[]');
-  _sightings = saved;
+window.onload = async function(){
+  const localSaved = JSON.parse(localStorage.getItem('fauna_sightings')||'[]');
+  _sightings = localSaved;
   renderLedger();
   updateExpeditionBanner();
-  if(navigator.onLine) syncExpeditionQueue();
+
+  if(navigator.onLine){
+    try{
+      const r = await fetch('/api/sightings');
+      const data = await r.json();
+      if(data && typeof data === 'object'){
+        const serverSightings = Object.values(data).sort((a,b)=>(b.ts||0)-(a.ts||0));
+        if(serverSightings.length){
+          _sightings = serverSightings;
+          renderLedger();
+        }
+      }
+    }catch(e){
+      // Offline or fetch failed — keep whatever loaded from local cache
+    }
+    syncExpeditionQueue();
+  }
 };
 
 window.addEventListener('beforeunload', ()=>{
