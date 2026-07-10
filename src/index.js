@@ -1,5 +1,47 @@
 const DB = 'https://riakoine-fauna-default-rtdb.asia-southeast1.firebasedatabase.app';
 
+const DAILY_IDENTIFY_LIMIT = 20; // generous for legitimate field use, catches abuse
+
+/**
+ * Basic per-IP daily rate limit for the /api/identify endpoint specifically,
+ * since it's the one that calls Claude's vision API and incurs real cost per
+ * request. Uses the existing Firebase database rather than requiring a new
+ * KV namespace. Returns a 429 Response if the limit is exceeded, or null to
+ * allow the request through.
+ */
+async function checkRateLimit(request) {
+  try {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const safeIp = ip.replace(/[.:#$\[\]]/g, '_');
+    const today = new Date().toISOString().slice(0, 10);
+    const path = '/fauna/ratelimits/' + safeIp + '/' + today + '.json';
+
+    const getRes = await fetch(DB + path);
+    const currentCount = (await getRes.json()) || 0;
+
+    if (currentCount >= DAILY_IDENTIFY_LIMIT) {
+      return new Response(JSON.stringify({
+        error: 'Daily identification limit reached for this connection. This resets tomorrow - thanks for using Biolog responsibly.'
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+
+    await fetch(DB + path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentCount + 1)
+    });
+
+    return null; // allow the request through
+  } catch (e) {
+    // If the rate limit check itself fails, fail open rather than blocking
+    // legitimate use over an infrastructure hiccup
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -19,6 +61,8 @@ export default {
     }
 
     if (url.pathname === '/api/identify' && request.method === 'POST') {
+      const rateLimitResponse = await checkRateLimit(request);
+      if (rateLimitResponse) return rateLimitResponse;
       return handleIdentify(request, env);
     }
     if (url.pathname === '/api/sightings') {
