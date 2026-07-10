@@ -25,6 +25,32 @@ export default {
       return handleSightings(request, env);
     }
 
+    // Fetch a single shared sighting by its Firebase key - used when someone
+    // opens a shared link (?sighting=firebaseKey) so they see the actual
+    // record even though it wasn't captured on their own device.
+    if (url.pathname === '/api/sighting' && request.method === 'GET') {
+      const sightingKey = url.searchParams.get('id');
+      if (!sightingKey) {
+        return new Response(JSON.stringify({ error: 'Missing id parameter' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      try {
+        const r = await fetch(DB + '/fauna/sightings/' + encodeURIComponent(sightingKey) + '.json');
+        const data = await r.json();
+        if (!data) {
+          return new Response(JSON.stringify({ error: 'Sighting not found' }), {
+            status: 404, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        }
+        return new Response(JSON.stringify(data), {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+      }
+    }
+
     const assetResponse = await env.ASSETS.fetch(request);
     const newResponse = new Response(assetResponse.body, assetResponse);
     newResponse.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebasedatabase.app https://api.anthropic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; media-src 'self' data: blob:; base-uri 'self'");
