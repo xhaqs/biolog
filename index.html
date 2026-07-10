@@ -1310,8 +1310,28 @@ function toggleLocalName(idx){
   renderLedger();
 }
 
-function showSharedSightingModal(s, notFound){
+function saveSharedSighting(sightingJson){
+  const s = JSON.parse(decodeURIComponent(sightingJson));
+  const localCopy = {...s, id: 'fn_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6), savedFromShare: true};
+  _sightings.unshift(localCopy);
+  saveLedgerLocal();
+  renderLedger();
+  toast('💾 Saved to your collection');
+  document.querySelectorAll('.shared-sighting-modal').forEach(m=>m.remove());
+}
+
+function shareSharedSightingAgain(name, url){
+  const text = '🐾 Field Sighting: '+name+'\n\n'+url;
+  if(navigator.share){
+    navigator.share({title:name, text:text, url:url}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(text).then(()=>toast('📋 Copied to clipboard')).catch(()=>toast('Could not copy','err'));
+  }
+}
+
+function showSharedSightingModal(s, notFound, sharedId){
   const modal = document.createElement('div');
+  modal.className = 'shared-sighting-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
   if(notFound){
     modal.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:24px;text-align:center;max-width:320px;font-family:\'IBM Plex Sans\',sans-serif;color:var(--slate)">'
@@ -1321,6 +1341,8 @@ function showSharedSightingModal(s, notFound){
       + '<button onclick="this.parentElement.parentElement.remove()" style="margin-top:16px;background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:10px 20px;cursor:pointer;width:100%;font-family:\'IBM Plex Sans\',sans-serif">Close</button>'
       + '</div>';
   } else {
+    const shareUrl = window.location.origin + window.location.pathname + '?sighting=' + sharedId;
+    const sightingJson = encodeURIComponent(JSON.stringify(s));
     modal.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px;text-align:center;max-width:340px;font-family:\'IBM Plex Sans\',sans-serif">'
       + (s.photo ? '<img src="'+s.photo+'" style="width:100%;border-radius:4px;margin-bottom:14px;max-height:280px;object-fit:contain;background:#000">' : '')
       + '<div style="display:inline-block;background:var(--moss);color:var(--paper);font-size:9px;font-family:\'IBM Plex Mono\',monospace;border-radius:2px;padding:3px 8px;margin-bottom:8px">SHARED FIELD SIGHTING</div>'
@@ -1328,7 +1350,11 @@ function showSharedSightingModal(s, notFound){
       + (s.latin ? '<div style="font-style:italic;color:var(--slate);font-size:13px;margin-bottom:8px">'+s.latin+'</div>' : '')
       + '<div class="mono" style="font-size:10px;color:var(--slate);margin-bottom:4px">'+(s.catalogNo||'')+' — '+(s.ts ? formatTime(s.ts) : 'Unknown date')+'</div>'
       + (s.verifyHash ? '<div class="mono" style="font-size:9px;color:var(--slate);margin-bottom:10px">VERIFY: '+s.verifyHash+'</div>' : '')
-      + '<button onclick="this.parentElement.parentElement.remove()" style="margin-top:10px;background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:10px 20px;cursor:pointer;width:100%;font-family:\'IBM Plex Sans\',sans-serif">Close</button>'
+      + '<div style="display:flex;gap:6px;margin-top:10px">'
+      + '<button onclick="saveSharedSighting(\''+sightingJson+'\')" style="flex:1;background:var(--moss);color:var(--paper);border:none;border-radius:3px;padding:9px;cursor:pointer;font-size:11px;font-family:\'IBM Plex Sans\',sans-serif">💾 SAVE</button>'
+      + '<button onclick="shareSharedSightingAgain(\''+(s.name||'Sighting').replace(/'/g,"")+'\',\''+shareUrl+'\')" style="flex:1;background:none;border:1px solid var(--border);border-radius:3px;padding:9px;cursor:pointer;font-size:11px;color:var(--slate);font-family:\'IBM Plex Sans\',sans-serif">⤴ SHARE</button>'
+      + '<button onclick="this.parentElement.parentElement.remove()" style="flex:1;background:none;border:1px solid var(--rust);border-radius:3px;padding:9px;cursor:pointer;font-size:11px;color:var(--rust);font-family:\'IBM Plex Sans\',sans-serif">✕ DISMISS</button>'
+      + '</div>'
       + '</div>';
   }
   document.body.appendChild(modal);
@@ -1350,7 +1376,7 @@ window.onload = async function(){
       const r = await fetch('/api/sighting?id=' + encodeURIComponent(sharedId));
       if(r.ok){
         const data = await r.json();
-        showSharedSightingModal(data, false);
+        showSharedSightingModal(data, false, sharedId);
       } else {
         showSharedSightingModal(null, true);
       }
