@@ -417,6 +417,7 @@ function showTargetPrompt(dataUrl, imgEl){
 
   imgEl.style.cursor = 'crosshair';
   imgEl.onclick = (e) => {
+    e.stopPropagation(); // prevent bubbling up to captureHero's onclick=startCapture(), which was re-opening the camera
     const rect = imgEl.getBoundingClientRect();
     const xRatio = (e.clientX - rect.left) / rect.width;
     const yRatio = (e.clientY - rect.top) / rect.height;
@@ -498,7 +499,8 @@ function showBurstPrompt(){
   wrap.appendChild(doneBtn);
 }
 
-function captureAnotherAngle(){
+function captureAnotherAngle(e){
+  if(e) e.stopPropagation(); // prevent bubbling up to captureHero's onclick=startCapture()
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -620,7 +622,8 @@ async function syncExpeditionQueue(){
 window.addEventListener('online', () => { updateExpeditionBanner(); syncExpeditionQueue(); });
 window.addEventListener('offline', () => { updateExpeditionBanner(); });
 
-async function finishBurstAndIdentify(){
+async function finishBurstAndIdentify(e){
+  if(e) e.stopPropagation(); // prevent bubbling up to captureHero's onclick=startCapture()
   const wrap = document.getElementById('burstBtnWrap');
   if(wrap) wrap.style.display = 'none';
 
