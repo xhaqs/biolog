@@ -757,12 +757,18 @@ function saveLedgerLocal(){
   }
 }
 
-function deleteSighting(id){
+function deleteSighting(id, idx){
   if(!confirm('Delete this specimen record? This cannot be undone.')) return;
   const beforeCount = _sightings.length;
-  _sightings = _sightings.filter(s=>s.id!==id);
+  // Delete by id when available, but fall back to array position - some
+  // records (e.g. from a partially-failed sync) may have a missing/undefined
+  // id, which would otherwise make them permanently impossible to delete
+  if(id !== undefined && id !== 'undefined' && _sightings.some(s=>s.id===id)){
+    _sightings = _sightings.filter(s=>s.id!==id);
+  } else if(idx !== undefined && idx >= 0 && idx < _sightings.length){
+    _sightings.splice(idx, 1);
+  }
   if(_sightings.length === beforeCount){
-    // Nothing was actually removed - id mismatch or record already gone
     toast('⚠️ Could not find this record to delete');
     return;
   }
@@ -985,7 +991,7 @@ function renderLedger(){
       +'<button onclick="generateDiscoveryCard(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:var(--moss);color:var(--paper);border:none;border-radius:2px;padding:5px;cursor:pointer">CARD</button>'
       +'<button onclick="shareSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">SHARE</button>'
       +'<button onclick="showSightingQR(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:5px;cursor:pointer;color:var(--slate)">QR</button>'
-      +'<button onclick="deleteSighting(\''+s.id+'\')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--rust);border-radius:2px;padding:5px;cursor:pointer;color:var(--rust)">DELETE</button>'
+      +'<button onclick="deleteSighting(\''+s.id+'\', '+idx+')" style="flex:1;font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--rust);border-radius:2px;padding:5px;cursor:pointer;color:var(--rust)">DELETE</button>'
     +'</div>'
     +'</div>'
   ).join('');
