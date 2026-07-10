@@ -63,6 +63,15 @@ header .tag{
 .capture-hero video, .capture-hero img{
   width:100%;height:100%;object-fit:cover;display:block;
 }
+/* The captured (already-taken) photo should show in full, uncropped -
+   object-fit:cover was visually hiding parts of the photo that don't match
+   the container's aspect ratio, even though the underlying saved image data
+   is complete and used correctly for identification. Only the live capture
+   placeholder/viewfinder should use the full-bleed "cover" look. */
+#capturedImg{
+  object-fit:contain!important;
+  background:#000;
+}
 .reticle{
   position:absolute;inset:0;
   pointer-events:none;
