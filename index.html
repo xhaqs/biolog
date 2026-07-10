@@ -792,6 +792,10 @@ function deleteSighting(id, idx){
 function shareSighting(id){
   const s = _sightings.find(x=>x.id===id);
   if(!s) return;
+  if(!s.name || s.name === 'Unidentified specimen'){
+    toast('⚠️ This record has no confirmed identification yet - nothing to share');
+    return;
+  }
   const url = window.location.origin + window.location.pathname + '?sighting=' + s.id;
   const text = '🐾 Field Sighting: '+s.name+(s.latin?' ('+s.latin+')':'')+'\n'+s.catalogNo+' — '+formatTime(s.ts)+'\nVerify: '+s.verifyHash+'\n\n'+url;
   if(navigator.share){
@@ -804,6 +808,10 @@ function shareSighting(id){
 function generateDiscoveryCard(id){
   const s = _sightings.find(x=>x.id===id);
   if(!s) return;
+  if(!s.photo || !s.name || s.name === 'Unidentified specimen' || !s.ts){
+    toast('⚠️ This record is incomplete (missing photo or ID) - card unavailable');
+    return;
+  }
 
   toast('🎨 Composing Discovery Card...');
 
@@ -932,7 +940,17 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
     }
   }
   lines.push(line);
+  const wasTruncated = maxLines && lines.length > maxLines;
   if(maxLines) lines = lines.slice(0, maxLines);
+  if(wasTruncated){
+    // Make it clear the card shows a summary, not the complete text -
+    // the full description remains available in the app's own ledger view
+    let lastLine = lines[lines.length - 1].trim();
+    while(ctx.measureText(lastLine + '…').width > maxWidth && lastLine.length > 0){
+      lastLine = lastLine.slice(0, -1).trim();
+    }
+    lines[lines.length - 1] = lastLine + '…';
+  }
   lines.forEach((l, idx) => ctx.fillText(l.trim(), x, y + idx*lineHeight));
 }
 
