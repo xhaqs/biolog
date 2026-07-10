@@ -741,15 +741,31 @@ function saveLedgerLocal(){
   try{
     localStorage.setItem('fauna_sightings', JSON.stringify(_sightings.slice(0,100)));
   }catch(e){
-    // Quota exceeded — Firebase already has the full data as source of truth.
-    // Do NOT overwrite existing good local cache with a lossy/truncated version.
-    console.warn('Local cache full — relying on Firebase sync for full photo data');
+    // Quota exceeded - retry with a smaller, photo-stripped version so that
+    // deletions and metadata changes at minimum persist, rather than silently
+    // failing and letting stale (including supposedly-deleted) records
+    // reappear on next load. Firebase remains the source of truth for full
+    // photo data; this local cache is just for offline/fast access.
+    try{
+      const stripped = _sightings.slice(0,50).map(s => s.photo ? {...s, photo: null} : s);
+      localStorage.setItem('fauna_sightings', JSON.stringify(stripped));
+      console.warn('Local cache quota exceeded - saved a reduced version (no photo data) to ensure deletions/changes persist locally');
+    }catch(e2){
+      console.error('Local cache save failed even with reduced data:', e2.message);
+      toast('⚠️ Storage full - this change may not persist after closing the app');
+    }
   }
 }
 
 function deleteSighting(id){
   if(!confirm('Delete this specimen record? This cannot be undone.')) return;
+  const beforeCount = _sightings.length;
   _sightings = _sightings.filter(s=>s.id!==id);
+  if(_sightings.length === beforeCount){
+    // Nothing was actually removed - id mismatch or record already gone
+    toast('⚠️ Could not find this record to delete');
+    return;
+  }
   saveLedgerLocal();
   renderLedger();
   toast('🗑️ Record deleted');
