@@ -56,6 +56,39 @@ export default {
       });
     }
 
+    // Verify a Payhip license key (from a real purchase) to gate access to
+    // the app. Uses Payhip's v2 license API with a product secret key kept
+    // server-side, never exposed to the client.
+    if (url.pathname === '/api/verify-license' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const licenseKey = (body.licenseKey || '').trim();
+        if (!licenseKey) {
+          return new Response(JSON.stringify({ valid: false, error: 'No license key provided' }), {
+            status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+        const payhipRes = await fetch(
+          'https://payhip.com/api/v2/license/verify?license_key=' + encodeURIComponent(licenseKey),
+          { headers: { 'product-secret-key': env.PAYHIP_PRODUCT_SECRET_KEY } }
+        );
+        if (!payhipRes.ok) {
+          return new Response(JSON.stringify({ valid: false, error: 'Invalid license key' }), {
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+        const data = await payhipRes.json();
+        const enabled = data?.data?.enabled === true;
+        return new Response(JSON.stringify({ valid: enabled }), {
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ valid: false, error: e.message }), {
+          status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      }
+    }
+
     if (url.pathname === '/api/rangecheck') {
       return handleRangeCheck(url);
     }

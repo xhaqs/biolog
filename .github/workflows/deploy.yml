@@ -39,3 +39,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+
+      - name: Set PAYHIP_PRODUCT_SECRET_KEY secret
+        run: echo "$PAYHIP_PRODUCT_SECRET_KEY" | wrangler secret put PAYHIP_PRODUCT_SECRET_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYHIP_PRODUCT_SECRET_KEY: ${{ secrets.PAYHIP_PRODUCT_SECRET_KEY }}
