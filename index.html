@@ -1114,9 +1114,9 @@ function renderLedger(){
     +'<div class="specimen-body">'
       +'<img class="specimen-thumb" src="'+s.photo+'">'
       +'<div class="specimen-info">'
-        +'<div class="specimen-name">'+(_showLocalNames[idx] && s.localName ? s.localName : s.name)+'</div>'
+        +'<div class="specimen-name">'+s.name+'</div>'
       +(s.latin?'<div class="specimen-latin">'+s.latin+'</div>':'')
-      +(s.localName?'<button onclick="toggleLocalName('+idx+')" style="font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:none;border:1px solid var(--border);border-radius:2px;padding:1px 6px;margin-top:3px;cursor:pointer;color:var(--slate)">'+(_showLocalNames[idx]?'EN':(s.localLanguage||'LOCAL').toUpperCase().slice(0,3))+' ⇄</button>':'')
+      
       +'<div class="specimen-desc">'+(s.description||'').slice(0,90)+((s.description||'').length>90?'…':'')+'</div>'
       +((s.habitatContext||s.weatherTemp||s.indicatorSpecies==='yes')?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:9px;font-family:\'IBM Plex Mono\',monospace;color:var(--slate)">'
         +(s.habitatContext?'<span style="background:var(--card);border:1px solid var(--border);border-radius:2px;padding:2px 6px">📍 '+s.habitatContext+'</span>':'')
