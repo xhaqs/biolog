@@ -738,7 +738,7 @@ async function identifySpecies(images, loc){
     const r = await fetch('/api/identify', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({images: payload, lat: loc?loc.lat:null, lng: loc?loc.lng:null})
+      body: JSON.stringify({images: payload, lat: loc?loc.lat:null, lng: loc?loc.lng:null, licenseKey: localStorage.getItem('biolog_license_key')||''})
     });
     const result = await r.json();
     if(!r.ok) throw new Error(result.error || ('Server error '+r.status));

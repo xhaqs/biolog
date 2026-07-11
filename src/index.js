@@ -9,6 +9,56 @@ const DAILY_IDENTIFY_LIMIT = 20; // generous for legitimate field use, catches a
  * KV namespace. Returns a 429 Response if the limit is exceeded, or null to
  * allow the request through.
  */
+const LIFETIME_ID_CAP = 1000; // matches the "Founder's Access - 1,000 lifetime identifications" offer
+
+/**
+ * Enforces the 1,000-lifetime-identification cap tied to each purchased
+ * license key (not just per-IP daily limits). Uses the existing Firebase
+ * database. The owner bypass code is exempt so testing isn't capped.
+ */
+async function checkLifetimeCap(request, env) {
+  try {
+    const body = await request.clone().json();
+    const licenseKey = (body.licenseKey || '').trim();
+
+    if (!licenseKey) {
+      // No license key provided - let the normal license gate handle this;
+      // don't block here on a missing key specifically
+      return null;
+    }
+
+    if (licenseKey === env.OWNER_BYPASS_CODE) {
+      return null; // owner testing is unlimited
+    }
+
+    const safeKey = licenseKey.replace(/[.:#$\[\]]/g, '_');
+    const path = '/fauna/lifetime_usage/' + safeKey + '.json';
+
+    const getRes = await fetch(DB + path);
+    const currentCount = (await getRes.json()) || 0;
+
+    if (currentCount >= LIFETIME_ID_CAP) {
+      return new Response(JSON.stringify({
+        error: 'You have used all ' + LIFETIME_ID_CAP + ' identifications included with your Founder\'s Access. Contact support if you need more.'
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+
+    await fetch(DB + path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentCount + 1)
+    });
+
+    return null;
+  } catch (e) {
+    // Fail open - don't block legitimate use over an infrastructure hiccup
+    return null;
+  }
+}
+
 async function checkRateLimit(request) {
   try {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -105,6 +155,8 @@ export default {
     if (url.pathname === '/api/identify' && request.method === 'POST') {
       const rateLimitResponse = await checkRateLimit(request);
       if (rateLimitResponse) return rateLimitResponse;
+      const lifetimeCapResponse = await checkLifetimeCap(request, env);
+      if (lifetimeCapResponse) return lifetimeCapResponse;
       return handleIdentify(request, env);
     }
     if (url.pathname === '/api/sightings') {
