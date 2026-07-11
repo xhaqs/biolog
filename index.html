@@ -743,7 +743,24 @@ async function identifySpecies(images, loc){
     const result = await r.json();
     if(!r.ok) throw new Error(result.error || ('Server error '+r.status));
     status.style.display = 'none';
-    await saveSighting(imageArr[0], result, loc, imageArr.length);
+
+    // The backend may return multiple distinct species found in one photo
+    // (e.g. several different fruits in the same shot). Create a separate
+    // sighting record for each one, all sharing the same photo/location.
+    const speciesList = Array.isArray(result.species) ? result.species : [result];
+    for(const oneSpecies of speciesList){
+      const merged = {
+        ...oneSpecies,
+        habitat_context: result.habitat_context,
+        weather_temp: result.weather_temp,
+        weather_condition: result.weather_condition,
+        weather_humidity: result.weather_humidity
+      };
+      await saveSighting(imageArr[0], merged, loc, imageArr.length);
+    }
+    if(speciesList.length > 1){
+      toast('🔬 Found '+speciesList.length+' distinct species in this photo');
+    }
   }catch(e){
     status.textContent = 'ID FAILED — TAP TO RETRY';
     toast('Identification failed: '+e.message, 'err', 5000);

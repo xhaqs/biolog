@@ -227,10 +227,12 @@ async function handleIdentify(request, env) {
       });
     }
 
-    const promptText = 'Identify the plant or animal species shown in ' + (imageList.length > 1 ? 'these '+imageList.length+' photos (different angles of the same specimen — use all of them together for a more confident identification).' : 'this image.')
+    const promptText = 'Identify the plant(s) and/or animal(s) shown in ' + (imageList.length > 1 ? 'these '+imageList.length+' photos (different angles of the same scene — use all of them together for a more confident identification).' : 'this image.')
+      + ' IMPORTANT: if there are multiple DISTINCT species visible (e.g. several different fruits, plants, or animals in the same shot), identify EACH ONE separately - do not merge them into a single generic answer.'
       + (lat && lng ? ' The photo was taken near latitude ' + lat + ', longitude ' + lng + ' — use this to infer the region and give the local/vernacular name in whatever language is predominant there.' : '')
-      + ' Also examine the visual background/surroundings in the photo to infer the immediate habitat context.'
-      + ' Reply ONLY in valid JSON, no markdown, no preamble, in this exact format: {"name":"English common name","latin":"Scientific name","local_name":"Local/vernacular name in the predominant regional language if known, otherwise empty string","local_language":"name of that language, e.g. Swahili, Spanish, Hindi, otherwise empty string","kingdom":"flora or fauna","description":"2-sentence natural history note: habitat, behavior, or identifying features","confidence":"high, medium, or low","invasive_risk":"high, medium, low, or unknown - whether this species is considered invasive in the given region","invasive_note":"1-sentence explanation if invasive_risk is high or medium, otherwise empty string","habitat_context":"brief inferred habitat from the photo background, e.g. near water, degraded forest, urban edge, grassland, wetland, forest canopy, rocky outcrop, garden/cultivated - your best guess from visual cues","indicator_species":"yes or no - whether this species is a recognized bioindicator of ecosystem health (clean water, air quality, undisturbed habitat, etc)","indicator_note":"1-sentence explanation if indicator_species is yes, otherwise empty string"}';
+      + ' Also examine the visual background/surroundings in the photo to infer the immediate habitat context (this applies to the overall scene, shared across all species found).'
+      + ' Reply ONLY in valid JSON, no markdown, no preamble, in this exact format: {"habitat_context":"brief inferred habitat from the photo background, e.g. near water, degraded forest, urban edge, grassland, wetland, forest canopy, rocky outcrop, garden/cultivated - your best guess from visual cues, shared across the whole scene","species":[{"name":"English common name","latin":"Scientific name","local_name":"Local/vernacular name in the predominant regional language if known, otherwise empty string","local_language":"name of that language, e.g. Swahili, Spanish, Hindi, otherwise empty string","kingdom":"flora or fauna","description":"2-sentence natural history note: habitat, behavior, or identifying features","confidence":"high, medium, or low","invasive_risk":"high, medium, low, or unknown - whether this species is considered invasive in the given region","invasive_note":"1-sentence explanation if invasive_risk is high or medium, otherwise empty string","indicator_species":"yes or no - whether this species is a recognized bioindicator of ecosystem health (clean water, air quality, undisturbed habitat, etc)","indicator_note":"1-sentence explanation if indicator_species is yes, otherwise empty string"}]}'
+      + ' The "species" field MUST be an array - even if there is only one specimen, wrap it in an array with one item.';
 
     const contentBlocks = imageList.map(img => ({
       type: 'image',
@@ -271,10 +273,16 @@ async function handleIdentify(request, env) {
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed.species)) {
+        // Defensive: if the model didn't wrap in an array as instructed,
+        // treat the whole object as a single species entry
+        parsed = { habitat_context: parsed.habitat_context || '', species: [parsed] };
+      }
     } catch (e) {
-      parsed = { name: 'Unidentified specimen', latin: '', kingdom: 'fauna', description: text.slice(0, 150), confidence: 'low' };
+      parsed = { habitat_context: '', species: [{ name: 'Unidentified specimen', latin: '', kingdom: 'fauna', description: text.slice(0, 150), confidence: 'low' }] };
     }
 
+    // Weather is shared across the whole scene, not per-species
     if (weather) {
       parsed.weather_temp = weather.temp;
       parsed.weather_condition = weather.condition;
