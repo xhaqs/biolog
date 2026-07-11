@@ -264,6 +264,8 @@ header .tag{
   }
 })();
 
+const OWNER_BYPASS_CODE = 'BIOLOG-OWNER-RIAKOINE-2026'; // developer testing only, not shared with buyers
+
 async function verifyLicenseKey(){
   const input = document.getElementById('licenseKeyInput');
   const btn = document.getElementById('unlockBtn');
@@ -274,6 +276,13 @@ async function verifyLicenseKey(){
   if(!key){
     errorEl.textContent = 'Please enter your license key';
     errorEl.style.display = 'block';
+    return;
+  }
+
+  if(key === OWNER_BYPASS_CODE){
+    localStorage.setItem('biolog_license_verified', 'true');
+    localStorage.setItem('biolog_license_key', 'owner-bypass');
+    document.getElementById('licenseGate').style.display = 'none';
     return;
   }
 
