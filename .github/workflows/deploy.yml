@@ -46,3 +46,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PAYHIP_PRODUCT_SECRET_KEY: ${{ secrets.PAYHIP_PRODUCT_SECRET_KEY }}
+
+      - name: Set OWNER_BYPASS_CODE secret
+        run: echo "$OWNER_BYPASS_CODE" | wrangler secret put OWNER_BYPASS_CODE
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OWNER_BYPASS_CODE: ${{ secrets.OWNER_BYPASS_CODE }}

@@ -68,6 +68,15 @@ export default {
             status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
           });
         }
+
+        // Owner bypass - lets Phoenix test the app freely without needing a
+        // real Payhip purchase each time. Checked server-side only.
+        if (licenseKey === env.OWNER_BYPASS_CODE) {
+          return new Response(JSON.stringify({ valid: true }), {
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+
         const payhipRes = await fetch(
           'https://payhip.com/api/v2/license/verify?license_key=' + encodeURIComponent(licenseKey),
           { headers: { 'product-secret-key': env.PAYHIP_PRODUCT_SECRET_KEY } }
