@@ -250,7 +250,7 @@ async function handleIdentify(request, env) {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 400,
+          max_tokens: 2000,
           messages: [{
             role: 'user',
             content: contentBlocks
