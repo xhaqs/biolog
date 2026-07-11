@@ -244,6 +244,69 @@ header .tag{
 </head>
 <body>
 
+<div id="licenseGate" style="position:fixed;inset:0;background:#0B0F0C;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'IBM Plex Sans',sans-serif;">
+  <div style="max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">🐾</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:#DDD3B0;letter-spacing:1px;margin-bottom:6px;">BIOLOG</div>
+    <div style="color:#8A9187;font-size:13px;line-height:1.6;margin-bottom:24px;">Enter your license key to unlock the app. Found in your purchase confirmation email or Payhip library.</div>
+    <input type="text" id="licenseKeyInput" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" style="width:100%;padding:12px;border-radius:4px;border:1px solid #2A342C;background:#141A16;color:#DDD3B0;font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:center;margin-bottom:10px;box-sizing:border-box;">
+    <button onclick="verifyLicenseKey()" id="unlockBtn" style="width:100%;padding:13px;border-radius:4px;background:#5C6B3F;color:#fff;border:none;font-weight:600;cursor:pointer;font-size:14px;font-family:'IBM Plex Sans',sans-serif;margin-bottom:14px;">Unlock Biolog</button>
+    <div id="licenseError" style="color:#C0524A;font-size:12px;margin-bottom:14px;display:none;"></div>
+    <div style="color:#5C6B54;font-size:12px;">Don't have a license yet? <a href="https://payhip.com/b/dWGxv" style="color:#8FA876;">Get Founder's Access →</a></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const verified = localStorage.getItem('biolog_license_verified');
+  if(verified === 'true'){
+    document.getElementById('licenseGate').style.display = 'none';
+  }
+})();
+
+async function verifyLicenseKey(){
+  const input = document.getElementById('licenseKeyInput');
+  const btn = document.getElementById('unlockBtn');
+  const errorEl = document.getElementById('licenseError');
+  const key = input.value.trim();
+  errorEl.style.display = 'none';
+
+  if(!key){
+    errorEl.textContent = 'Please enter your license key';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Verifying...';
+  btn.disabled = true;
+
+  try{
+    const res = await fetch('/api/verify-license', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ licenseKey: key })
+    });
+    const data = await res.json();
+    btn.textContent = 'Unlock Biolog';
+    btn.disabled = false;
+
+    if(data.valid){
+      localStorage.setItem('biolog_license_verified', 'true');
+      localStorage.setItem('biolog_license_key', key);
+      document.getElementById('licenseGate').style.display = 'none';
+    } else {
+      errorEl.textContent = 'Invalid or already-used license key. Check it matches exactly, or contact support.';
+      errorEl.style.display = 'block';
+    }
+  }catch(e){
+    btn.textContent = 'Unlock Biolog';
+    btn.disabled = false;
+    errorEl.textContent = 'Could not verify right now - check your connection and try again.';
+    errorEl.style.display = 'block';
+  }
+}
+</script>
+
 <div id="expeditionBanner" style="display:none;background:var(--amber);color:var(--paper);font-size:11px;font-family:'IBM Plex Mono',monospace;padding:8px 14px;text-align:center;display:flex;justify-content:space-between;align-items:center;gap:8px">
   <span id="expeditionBannerText">📵 OFFLINE — 0 pending</span>
   <button id="expeditionSyncBtn" onclick="syncExpeditionQueue()" style="background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace">🔄 SYNC NOW</button>
